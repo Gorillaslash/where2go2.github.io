@@ -91,6 +91,14 @@
   .minutes-suffix { position:relative; }
   .minutes-suffix span.unit { position:absolute; right:16px; top:50%; transform:translateY(-50%);
     color:var(--text-dim); font-size:0.95rem; }
+  .duration-field { display:flex; gap:10px; }
+  .duration-box { flex:1; background:var(--field); border-radius:12px; padding:14px 16px;
+    display:flex; align-items:center; justify-content:space-between; }
+  .duration-input { width:100%; background:none; border:none; color:var(--text); font-size:1rem;
+    outline:none; -moz-appearance:textfield; }
+  .duration-input::-webkit-outer-spin-button, .duration-input::-webkit-inner-spin-button {
+    -webkit-appearance:none; margin:0; }
+  .duration-unit { color:var(--text-dim); font-size:0.9rem; margin-left:8px; flex-shrink:0; white-space:nowrap; }
 
   .info-card { background:var(--panel-raised); border-radius:14px; padding:14px 16px; margin:6px 0 20px;
     display:flex; gap:12px; align-items:flex-start; }
@@ -199,12 +207,24 @@
         <div class="select-wrap" style="margin-bottom:10px;">
           <select class="select-field" id="timeUnit">
             <option value="minutes">Minutes</option>
-            <option value="hours">Hours</option>
+            <option value="hours-minutes">Hours and minutes</option>
           </select>
         </div>
-        <div class="minutes-suffix">
-          <input class="text-field" id="travelTime" type="number" min="1" max="180" value="15" />
-          <span class="unit" id="unitLabel">minutes</span>
+
+        <div class="minutes-suffix" id="minutesOnlyField">
+          <input class="text-field" id="travelTime" type="number" min="0" inputmode="numeric" value="15" />
+          <span class="unit">minutes</span>
+        </div>
+
+        <div class="duration-field" id="hoursMinutesField" style="display:none;">
+          <div class="duration-box">
+            <input class="duration-input" id="travelHours" type="number" min="0" inputmode="numeric" value="0" />
+            <span class="duration-unit">hours</span>
+          </div>
+          <div class="duration-box">
+            <input class="duration-input" id="travelMinutes" type="number" min="0" inputmode="numeric" value="15" />
+            <span class="duration-unit">mins</span>
+          </div>
         </div>
       </div>
 
@@ -343,8 +363,11 @@
   const travelModeSel = document.getElementById('travelMode');
   const timeUnitSel = document.getElementById('timeUnit');
   const travelTimeInput = document.getElementById('travelTime');
+  const travelHoursInput = document.getElementById('travelHours');
+  const travelMinutesInput = document.getElementById('travelMinutes');
+  const minutesOnlyField = document.getElementById('minutesOnlyField');
+  const hoursMinutesField = document.getElementById('hoursMinutesField');
   const journeyTypeSel = document.getElementById('journeyType');
-  const unitLabel = document.getElementById('unitLabel');
   const infoTitle = document.getElementById('infoTitle');
   const infoSub = document.getElementById('infoSub');
   const homeBaseInput = document.getElementById('homeBaseInput');
@@ -353,17 +376,80 @@
     return { 'foot-walking':'walking', 'cycling-regular':'cycling', 'driving-car':'driving', 'wheelchair':'wheelchair' }[v] || 'walking';
   }
 
-  function updateInfoCard(){
-    const t = travelTimeInput.value || '15';
-    const unit = timeUnitSel.value === 'hours' ? (t == 1 ? 'hour' : 'hours') : 'minutes';
-    infoTitle.textContent = `${t} ${unit} ${modeLabel(travelModeSel.value)} area`;
-    infoSub.textContent = `Starting from ${homeBaseInput.value || 'your chosen point'}`;
-    unitLabel.textContent = timeUnitSel.value;
+  // Shows the right pair of fields for the selected mode
+  function setTimeMode(mode){
+    timeUnitSel.value = mode;
+    if (mode === 'minutes'){
+      minutesOnlyField.style.display = '';
+      hoursMinutesField.style.display = 'none';
+    } else {
+      minutesOnlyField.style.display = 'none';
+      hoursMinutesField.style.display = '';
+    }
   }
-  [travelModeSel, timeUnitSel, travelTimeInput, journeyTypeSel, homeBaseInput].forEach(el=>{
+
+  // Carries minutes over into hours whenever minutes reaches 60 or more (hours-and-minutes mode)
+  function normalizeDuration(){
+    let h = parseInt(travelHoursInput.value, 10);
+    let m = parseInt(travelMinutesInput.value, 10);
+    if (isNaN(h) || h < 0) h = 0;
+    if (isNaN(m) || m < 0) m = 0;
+    if (m >= 60){
+      h += Math.floor(m / 60);
+      m = m % 60;
+      travelHoursInput.value = h;
+      travelMinutesInput.value = m;
+    }
+  }
+
+  // In minutes-only mode, typing 60+ automatically switches over to hours-and-minutes
+  travelTimeInput.addEventListener('input', function(){
+    let v = parseInt(travelTimeInput.value, 10);
+    if (isNaN(v) || v < 0) v = 0;
+    if (v >= 60){
+      travelHoursInput.value = Math.floor(v / 60);
+      travelMinutesInput.value = v % 60;
+      setTimeMode('hours-minutes');
+    }
+  });
+
+  timeUnitSel.addEventListener('change', function(){
+    setTimeMode(timeUnitSel.value);
+    updateInfoCard();
+  });
+
+  function currentDurationMinutes(){
+    if (timeUnitSel.value === 'minutes'){
+      let v = parseInt(travelTimeInput.value, 10);
+      if (isNaN(v) || v < 0) v = 0;
+      return v;
+    }
+    normalizeDuration();
+    const h = parseInt(travelHoursInput.value, 10) || 0;
+    const m = parseInt(travelMinutesInput.value, 10) || 0;
+    return h * 60 + m;
+  }
+
+  function updateInfoCard(){
+    const totalMinutes = currentDurationMinutes();
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    let timeLabel;
+    if (h > 0 && m > 0){
+      timeLabel = `${h} ${h === 1 ? 'hour' : 'hours'} ${m} min`;
+    } else if (h > 0){
+      timeLabel = `${h} ${h === 1 ? 'hour' : 'hours'}`;
+    } else {
+      timeLabel = `${m} minutes`;
+    }
+    infoTitle.textContent = `${timeLabel} ${modeLabel(travelModeSel.value)} area`;
+    infoSub.textContent = `Starting from ${homeBaseInput.value || 'your chosen point'}`;
+  }
+  [travelModeSel, travelTimeInput, travelHoursInput, travelMinutesInput, journeyTypeSel, homeBaseInput].forEach(el=>{
     el.addEventListener('input', updateInfoCard);
     el.addEventListener('change', updateInfoCard);
   });
+  setTimeMode('minutes');
   updateInfoCard();
 
   // ---------- Location suggestions dropdown ----------
@@ -405,7 +491,7 @@
       const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
       if (!res.ok) return;
       const data = await res.json();
-      if (myRequestId !== suggestRequestId) return;
+      if (myRequestId !== suggestRequestId) return; // a newer keystroke already started a fresher request
       renderSuggestions(data);
     } catch (err) {
       // suggestions are a nice-to-have; failures here shouldn't block the rest of the app
@@ -462,11 +548,10 @@
   }
 
   function secondsFromInputs(){
-    const t = parseFloat(travelTimeInput.value);
-    if (!t || t <= 0) return null;
-    const unit = timeUnitSel.value;
-    let secs = unit === 'hours' ? t * 3600 : t * 60;
-    if (journeyTypeSel.value === 'return') secs = secs / 2;
+    const totalMinutes = currentDurationMinutes();
+    if (totalMinutes <= 0) return null;
+    let secs = totalMinutes * 60;
+    if (journeyTypeSel.value === 'return') secs = secs / 2; // reachable area for a return trip = half the time each way
     return Math.round(secs);
   }
 
@@ -529,4 +614,4 @@
 })();
 </script>
 </body>
-  </html>
+</html>
