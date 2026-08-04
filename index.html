@@ -402,7 +402,8 @@
     }
   }
 
-  // In minutes-only mode, typing 60+ automatically switches over to hours-and-minutes
+  // In minutes-only mode, typing 60+ automatically switches over to hours-and-minutes,
+  // keeping the cursor in the minutes box so typing isn't interrupted
   travelTimeInput.addEventListener('input', function(){
     let v = parseInt(travelTimeInput.value, 10);
     if (isNaN(v) || v < 0) v = 0;
@@ -410,8 +411,30 @@
       travelHoursInput.value = Math.floor(v / 60);
       travelMinutesInput.value = v % 60;
       setTimeMode('hours-minutes');
+      travelMinutesInput.focus();
     }
   });
+
+  // Backspacing in an empty minutes box jumps focus back to the hours box
+  travelMinutesInput.addEventListener('keydown', function(e){
+    if (e.key === 'Backspace' && travelMinutesInput.value === ''){
+      e.preventDefault();
+      travelHoursInput.focus();
+    }
+  });
+
+  // Backspacing in an empty hours box drops back to minutes-only mode,
+  // carrying over whatever's still in the minutes box
+  travelHoursInput.addEventListener('keydown', function(e){
+    if (e.key === 'Backspace' && travelHoursInput.value === ''){
+      e.preventDefault();
+      const remainingMinutes = parseInt(travelMinutesInput.value, 10) || 0;
+      travelTimeInput.value = remainingMinutes;
+      setTimeMode('minutes');
+      travelTimeInput.focus();
+      updateInfoCard();
+    }
+  }); 
 
   timeUnitSel.addEventListener('change', function(){
     setTimeMode(timeUnitSel.value);
