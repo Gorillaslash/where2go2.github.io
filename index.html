@@ -278,13 +278,13 @@
 
   </div>
 
-  <div class="footnote">Prototype map. Travel area is illustrative.</div>
+  <div class="footnote">Prototype map. Travel area is illustrative. Map data © OpenStreetMap contributors, © CARTO.</div>
 </div>
 
 <script>
 (function(){
   // ---------- Map setup ----------
-  const map = L.map('map', { zoomControl:false, attributionControl:true }).setView([51.5308, -0.1238], 14); // King's Cross default
+  const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([51.5308, -0.1238], 14); // King's Cross default
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
     subdomains: 'abcd',
