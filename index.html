@@ -18,7 +18,38 @@
     --accent: #79ead2;
     --accent-strong: #4fd8bb;
     --border: #313135;
-    --btn-grey: #d8d8db;
+    --btn-bg: #d8d8db;
+    --btn-text: #111111;
+  }
+  [data-theme="light"] {
+    --bg: #f4f4f6;
+    --panel: #ffffff;
+    --panel-raised: #eef0f1;
+    --field: #e9e9ec;
+    --field-2: #dedee2;
+    --text: #17171a;
+    --text-dim: #63636a;
+    --accent: #159c82;
+    --accent-strong: #0f8069;
+    --border: #d6d6da;
+    --btn-bg: #17171a;
+    --btn-text: #ffffff;
+  }
+  @media (prefers-color-scheme: light) {
+    [data-theme="system"] {
+      --bg: #f4f4f6;
+      --panel: #ffffff;
+      --panel-raised: #eef0f1;
+      --field: #e9e9ec;
+      --field-2: #dedee2;
+      --text: #17171a;
+      --text-dim: #63636a;
+      --accent: #159c82;
+      --accent-strong: #0f8069;
+      --border: #d6d6da;
+      --btn-bg: #17171a;
+      --btn-text: #ffffff;
+    }
   }
   * { box-sizing: border-box; }
   html, body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--text);
@@ -56,7 +87,7 @@
   /* Map hero (fixed height — this part does NOT scroll on its own) */
   .map-hero { position:relative; height:20vh; min-height:150px; overflow:hidden; }
   #map { position:absolute; inset:0; z-index:0; background:#0d1b17; }
-  .leaflet-container { background:#101014; }
+  .leaflet-container { background:var(--bg); }
 
   /* Search row */
   .search-row { position:absolute; left:16px; right:16px; bottom:14px; z-index:5;
@@ -70,7 +101,7 @@
   .round-btn { width:48px; height:48px; border-radius:14px; background:var(--field);
     border:none; color:var(--text); display:flex; align-items:center; justify-content:center;
     cursor:pointer; flex-shrink:0; }
-  .round-btn.compass { background:var(--btn-grey); color:#111; }
+  .round-btn.compass { background:var(--btn-bg); color:var(--btn-text); }
   .round-btn:hover { filter:brightness(1.1); }
   .search-box-wrap { position:relative; flex:1; }
   .suggestions-dropdown { position:absolute; top:calc(100% + 6px); left:0; right:0;
@@ -122,11 +153,11 @@
   .info-card .info-title { font-weight:700; font-size:1rem; margin-bottom:2px; }
   .info-card .info-sub { color:var(--text-dim); font-size:0.9rem; }
 
-  .primary-btn { width:100%; background:var(--btn-grey); color:#111; border:none; border-radius:14px;
+  .primary-btn { width:100%; background:var(--btn-bg); color:var(--btn-text); border:none; border-radius:14px;
     padding:16px; font-size:1.05rem; font-weight:700; display:flex; align-items:center;
     justify-content:center; gap:10px; cursor:pointer; }
   .primary-btn:disabled { opacity:0.5; cursor:not-allowed; }
-  .primary-btn:not(:disabled):hover { background:#fff; }
+  .primary-btn:not(:disabled):hover { filter:brightness(1.15); }
   .primary-btn.loading { opacity:0.75; }
 
   .footnote { text-align:center; font-size:0.72rem; color:var(--text-dim); padding:14px 16px 24px; }
@@ -155,6 +186,16 @@
 
   ::-webkit-scrollbar { width:0; height:0; }
 </style>
+<script>
+(function(){
+  try {
+    var saved = localStorage.getItem('where2go_theme');
+    document.documentElement.setAttribute('data-theme', saved || 'system');
+  } catch (err) {
+    document.documentElement.setAttribute('data-theme', 'system');
+  }
+})();
+</script>
 </head>
 <body>
 <div id="app">
@@ -184,6 +225,15 @@
 
     <div class="menu-section">
       <h3 class="menu-section-title">Settings</h3>
+
+      <label class="field-label">Theme</label>
+      <div class="select-wrap" style="margin-bottom:14px;">
+        <select class="select-field" id="menuTheme">
+          <option value="system">Match my phone</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
 
       <label class="field-label">Default travel mode</label>
       <div class="select-wrap" style="margin-bottom:14px;">
@@ -339,11 +389,33 @@
 (function(){
   // ---------- Map setup ----------
   const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([51.5308, -0.1238], 14); // King's Cross default
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  const LIGHT_TILES = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  const tileLayer = L.tileLayer(DARK_TILES, {
     attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
     subdomains: 'abcd',
     maxZoom: 20
   }).addTo(map);
+
+  // Figures out whether the app is currently showing light or dark, accounting for "system" mode
+  function effectiveTheme(){
+    const attr = document.documentElement.getAttribute('data-theme') || 'system';
+    if (attr === 'system'){
+      return (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+    }
+    return attr;
+  }
+  function applyMapTheme(){
+    tileLayer.setUrl(effectiveTheme() === 'light' ? LIGHT_TILES : DARK_TILES);
+  }
+  applyMapTheme();
+  if (window.matchMedia){
+    try {
+      window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(){
+        if ((document.documentElement.getAttribute('data-theme') || 'system') === 'system') applyMapTheme();
+      });
+    } catch (err) { /* older browsers without addEventListener on matchMedia — safe to skip */ }
+  }
 
   let startMarker = L.marker([51.5308, -0.1238], { draggable:true }).addTo(map);
   let isochroneLayer = null;
@@ -356,6 +428,18 @@
   const menuPanel = document.getElementById('menuPanel');
   const menuDefaultTravelMode = document.getElementById('menuDefaultTravelMode');
   const menuDefaultJourneyType = document.getElementById('menuDefaultJourneyType');
+  const menuTheme = document.getElementById('menuTheme');
+
+  try {
+    menuTheme.value = localStorage.getItem('where2go_theme') || 'system';
+  } catch (err) {
+    menuTheme.value = 'system';
+  }
+  menuTheme.addEventListener('change', function(){
+    document.documentElement.setAttribute('data-theme', menuTheme.value);
+    try { localStorage.setItem('where2go_theme', menuTheme.value); } catch (err) {}
+    applyMapTheme();
+  });
 
   function openMenu(){
     menuOverlay.classList.add('open');
@@ -649,7 +733,7 @@
   async function fetchIsochrone(profile, lat, lng, seconds){
     const url = `${PROXY_URL}/isochrones/${profile}`;
     const body = {
-      locations: [[lng, lat]],
+      locations: [[lng, lat]],       // ORS expects [lon, lat]
       range: [seconds],
       range_type: 'time',
       attributes: ['area']
@@ -691,6 +775,7 @@
     showAreaLabel.textContent = 'Finding reachable area…';
 
     try {
+      // If the home base text looks like a place name (not "lat, lng" and not "My location"), geocode it first
       const raw = homeBaseInput.value.trim();
       const coordMatch = raw.match(/^(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)$/);
       if (coordMatch && raw !== 'My location'){
@@ -733,4 +818,4 @@
 })();
 </script>
 </body>
-                                                                                                                                                                                                        </html>
+  </html>
