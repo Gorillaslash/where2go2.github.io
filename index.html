@@ -34,9 +34,24 @@
   .icon-btn svg { display:block; }
   .brand { flex:1; display:flex; align-items:center; justify-content:center; gap:8px;
     font-weight:600; font-size:1.05rem; color:var(--text); text-decoration:none; }
-    font-weight:600; font-size:1.05rem; }
   .brand .logo { width:26px; height:26px; border-radius:6px; background:var(--field-2);
     display:flex; align-items:center; justify-content:center; }
+
+  /* Slide-out menu */
+  .menu-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:90;
+    opacity:0; pointer-events:none; transition:opacity 0.2s ease; }
+  .menu-overlay.open { opacity:1; pointer-events:auto; }
+  .menu-panel { position:fixed; top:0; left:0; bottom:0; width:82%; max-width:340px;
+    background:var(--panel); z-index:100; padding:18px; overflow-y:auto;
+    transform:translateX(-100%); transition:transform 0.25s ease; box-shadow:4px 0 24px rgba(0,0,0,0.4); }
+  .menu-panel.open { transform:translateX(0); }
+  .menu-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .menu-title { font-weight:700; font-size:1.1rem; }
+  .menu-section { margin-bottom:26px; }
+  .menu-section-title { font-size:0.85rem; text-transform:uppercase; letter-spacing:0.04em;
+    color:var(--text-dim); margin:0 0 12px; }
+  .menu-text { font-size:0.9rem; line-height:1.5; margin:0 0 10px; }
+  .menu-text-dim { color:var(--text-dim); font-size:0.82rem; }
 
   /* Map hero (fixed height — this part does NOT scroll on its own) */
   .map-hero { position:relative; height:20vh; min-height:150px; overflow:hidden; }
@@ -146,7 +161,7 @@
 
   <div class="topbar">
     <div class="left">
-      <button class="icon-btn" aria-label="Menu">
+      <button class="icon-btn" aria-label="Menu" id="menuBtn">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
       </button>
     </div>
@@ -156,6 +171,44 @@
       </span>
       where2go2
     </a>
+  </div>
+
+  <div class="menu-overlay" id="menuOverlay"></div>
+  <div class="menu-panel" id="menuPanel">
+    <div class="menu-header">
+      <span class="menu-title">Menu</span>
+      <button class="icon-btn" aria-label="Close menu" id="menuCloseBtn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+      </button>
+    </div>
+
+    <div class="menu-section">
+      <h3 class="menu-section-title">Settings</h3>
+
+      <label class="field-label">Default travel mode</label>
+      <div class="select-wrap" style="margin-bottom:14px;">
+        <select class="select-field" id="menuDefaultTravelMode">
+          <option value="foot-walking">Walk</option>
+          <option value="cycling-regular">Cycle</option>
+          <option value="driving-car">Drive</option>
+          <option value="wheelchair">Wheelchair</option>
+        </select>
+      </div>
+
+      <label class="field-label">Default journey type</label>
+      <div class="select-wrap">
+        <select class="select-field" id="menuDefaultJourneyType">
+          <option value="one-way">One way</option>
+          <option value="return">Return</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="menu-section">
+      <h3 class="menu-section-title">About</h3>
+      <p class="menu-text">where2go2 shows how far you can travel from a starting point within a chosen amount of time, walking, cycling, driving, or by wheelchair.</p>
+      <p class="menu-text menu-text-dim">Map tiles and geocoding by OpenStreetMap contributors and CARTO. Reachable-area calculations by OpenRouteService.</p>
+    </div>
   </div>
 
   <div class="map-hero">
@@ -279,7 +332,7 @@
 
   </div>
 
-  <div class="footnote">Prototype map. Travel area is illustrative. Map data © OpenStreetMap contributors, © CARTO.</div>
+  <div class="footnote">Prototype map. Travel area is illustrative.</div>
 </div>
 
 <script>
@@ -295,6 +348,52 @@
   let startMarker = L.marker([51.5308, -0.1238], { draggable:true }).addTo(map);
   let isochroneLayer = null;
   let startLatLng = { lat: 51.5308, lng: -0.1238 };
+
+  // ---------- Menu panel ----------
+  const menuBtn = document.getElementById('menuBtn');
+  const menuCloseBtn = document.getElementById('menuCloseBtn');
+  const menuOverlay = document.getElementById('menuOverlay');
+  const menuPanel = document.getElementById('menuPanel');
+  const menuDefaultTravelMode = document.getElementById('menuDefaultTravelMode');
+  const menuDefaultJourneyType = document.getElementById('menuDefaultJourneyType');
+
+  function openMenu(){
+    menuOverlay.classList.add('open');
+    menuPanel.classList.add('open');
+  }
+  function closeMenu(){
+    menuOverlay.classList.remove('open');
+    menuPanel.classList.remove('open');
+  }
+  menuBtn.addEventListener('click', openMenu);
+  menuCloseBtn.addEventListener('click', closeMenu);
+  menuOverlay.addEventListener('click', closeMenu);
+
+  // Load any saved defaults and apply them to both the menu and the main form
+  try {
+    const savedMode = localStorage.getItem('where2go_defaultTravelMode');
+    const savedJourney = localStorage.getItem('where2go_defaultJourneyType');
+    if (savedMode){
+      menuDefaultTravelMode.value = savedMode;
+      document.getElementById('travelMode').value = savedMode;
+    }
+    if (savedJourney){
+      menuDefaultJourneyType.value = savedJourney;
+      document.getElementById('journeyType').value = savedJourney;
+    }
+  } catch (err) {
+    // localStorage may be unavailable (e.g. private browsing) — defaults just won't persist
+  }
+
+  menuDefaultTravelMode.addEventListener('change', function(){
+    document.getElementById('travelMode').value = menuDefaultTravelMode.value;
+    try { localStorage.setItem('where2go_defaultTravelMode', menuDefaultTravelMode.value); } catch (err) {}
+    updateInfoCard();
+  });
+  menuDefaultJourneyType.addEventListener('change', function(){
+    document.getElementById('journeyType').value = menuDefaultJourneyType.value;
+    try { localStorage.setItem('where2go_defaultJourneyType', menuDefaultJourneyType.value); } catch (err) {}
+  });
 
   startMarker.on('dragend', function(e){
     const pos = e.target.getLatLng();
@@ -634,4 +733,4 @@
 })();
 </script>
 </body>
-</html>
+                                                                                                                                                                                                        </html>
